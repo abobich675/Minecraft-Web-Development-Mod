@@ -22,6 +22,7 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public class ServerCommandBlockEntity extends BlockEntity {
     public ServerCommandBlockEntity(BlockPos pos, BlockState state) {
@@ -47,39 +48,54 @@ public class ServerCommandBlockEntity extends BlockEntity {
     private String ReadStack(int x, int y, int z) {
         BlockPos pos = new BlockPos(x, y, z);
         Block block = world.getBlockState(pos).getBlock();
+        if (pos.getY() >= world.getHeight() || CompareBlockID(block, "minecraft", "air"))
+            return "";
 
-        final StringBuilder html = new StringBuilder();
+        String html = "";
+        Identifier id = Registries.BLOCK.getId(block);
+        System.out.println(id);
 
-        while (pos.getY() < world.getHeight() && !CompareBlockID(block, "minecraft", "air")) {
-            Identifier id = Registries.BLOCK.getId(block);
-            System.out.println(id);
-
+        if (block instanceof SignBlock) {
             ServerWorld serverWorld = (ServerWorld) world; // cast only if you're sure it's server side
             final BlockPos finalPos = pos;
+            CompletableFuture<String> future = new CompletableFuture<>();
             // Have the server deal with BlockEntities
             serverWorld.getServer().execute(() -> {
-                        BlockEntity be = world.getBlockEntity(finalPos);
-                        System.out.println(be);
-                        if (be instanceof SignBlockEntity signEntity) {
-                            Text[] frontText = signEntity.getFrontText().getMessages(false);
-                            Text[] backText = signEntity.getBackText().getMessages(false);
+                String signHtml = "";
+                BlockEntity be = world.getBlockEntity(finalPos);
+                System.out.println(be);
+                if (be instanceof SignBlockEntity signEntity) {
+                    Text[] frontText = signEntity.getFrontText().getMessages(false);
+                    Text[] backText = signEntity.getBackText().getMessages(false);
 
-                            for (Text text : frontText) {
-                                System.out.println(text.getString());
-                                html.append(text.getString());
-                            }
-                            for (Text text : backText) {
-                                System.out.println(text.getString());
-                                html.append(text.getString());
-                            }
-                        }
-                    });
+                    for (Text text : frontText) {
+                        System.out.println(text.getString());
+                        signHtml += text.getString();
+                    }
+                    for (Text text : backText) {
+                        System.out.println(text.getString());
+                        signHtml += text.getString();
+                    }
+                }
+                future.complete(signHtml);
+            });
+            try {
+                String signHtml = future.get();
+                signHtml = signHtml.replace("<", "&lt;");
+                signHtml = signHtml.replace(">", "&gt;");
 
-            pos = pos.up();
-            block = world.getBlockState(pos).getBlock();
+                html += signHtml;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        } else {
+            html += "\r\n<div>";
+            html += ReadStack(x, y + 1, z);
+            html += "\r\n</div>";
         }
 
-        return html.toString();
+        return html;
     }
 
     private String ParseXZ(int xDir, int zDir) {
