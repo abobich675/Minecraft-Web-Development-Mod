@@ -289,10 +289,20 @@ public class ServerCommandBlockEntity extends BlockEntity {
         return true;
     }
 
+    public int getPortForBlock(Block block) {
+        Identifier id = Registries.BLOCK.getId(block); // e.g., "yourmod:server_command_block"
+        int hash = id.toString().hashCode(); // turn into a consistent hash
+        int basePort = 3000;
+
+        // Make sure the port is in a valid range (1024–65535)
+        int port = basePort + (Math.abs(hash) % (65535 - basePort));
+        return port;
+    }
+
     public int tryStartServer(PlayerEntity player, World world, BlockPos pos, int port) {
         this.world = world;
         if (IsValidServer(pos)) {
-            this.port = port;
+            this.port = getPortForBlock(world.getBlockState(pos.up()).getBlock());
             StartServer(player);
             return 1;
         }
