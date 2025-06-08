@@ -22,5 +22,7 @@ public class ModBlockEntities {
 
     public static void initialize() {}
 
-    public static final BlockEntityType<CounterBlockEntity> COUNTER_BLOCK_ENTITY = registerBlock("counter_block", CounterBlockEntity::new, ModBlocks.COUNTER_BLOCK);
+    public static final BlockEntityType<CounterBlockEntity> COUNTER_BLOCK_ENTITY = registerBlock("counter", CounterBlockEntity::new, ModBlocks.COUNTER_BLOCK);
+    public static final BlockEntityType<ServerCommandBlockEntity> SERVER_COMMAND_ENTITY = registerBlock("server_command", ServerCommandBlockEntity::new, ModBlocks.SERVER_COMMAND);
+
 }
