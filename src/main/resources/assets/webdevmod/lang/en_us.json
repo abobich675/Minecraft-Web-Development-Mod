@@ -7,5 +7,7 @@
   "block.webdevmod.style_outline": "Style Outline",
   "item.webdevmod.style_outline": "Style Outline",
   "block.webdevmod.style_command": "Style Command",
-  "item.webdevmod.style_command": "Style Command"
+  "item.webdevmod.style_command": "Style Command",
+  "block.webdevmod.counter": "Counter",
+  "item.webdevmod.counter": "Counter"
 }

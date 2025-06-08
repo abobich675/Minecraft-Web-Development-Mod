@@ -1,7 +1,6 @@
 package com.example.blocks;
 
 import com.example.Main;
-import com.example.items.ModItems;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
@@ -55,6 +54,9 @@ public class ModBlocks {
                 .register((itemGroup) -> itemGroup.add(ModBlocks.STYLE_COMMAND.asItem()));
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS)
                 .register((itemGroup) -> itemGroup.add(ModBlocks.STYLE_OUTLINE.asItem()));
+
+        ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS)
+                .register((itemGroup) -> itemGroup.add(ModBlocks.COUNTER_BLOCK.asItem()));
     }
 
     public static final Block SERVER_COMMAND = registerBlock("server_command", ServerCommandBlock::new, AbstractBlock.Settings.create().sounds(BlockSoundGroup.AMETHYST_BLOCK), true);
@@ -62,4 +64,6 @@ public class ModBlocks {
 
     public static final Block STYLE_COMMAND = registerBlock("style_command", StyleCommandBlock::new, AbstractBlock.Settings.create().sounds(BlockSoundGroup.AMETHYST_BLOCK), true);
     public static final Block STYLE_OUTLINE = registerBlock("style_outline", Block::new, AbstractBlock.Settings.create().sounds(BlockSoundGroup.AMETHYST_BLOCK), true);
+
+    public static final Block COUNTER_BLOCK = registerBlock("counter", CounterBlock::new, AbstractBlock.Settings.create(), true);
 }

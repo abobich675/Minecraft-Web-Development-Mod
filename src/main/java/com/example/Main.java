@@ -1,5 +1,6 @@
 package com.example;
 
+import com.example.blocks.ModBlockEntities;
 import com.example.blocks.ModBlocks;
 import com.example.items.ModItems;
 import net.fabricmc.api.ModInitializer;
@@ -30,6 +31,7 @@ public class Main implements ModInitializer {
 
 		ModItems.initialize();
 		ModBlocks.initialize();
+		ModBlockEntities.initialize();
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			dispatcher.register(CommandManager.literal("test_command").executes(context -> {
