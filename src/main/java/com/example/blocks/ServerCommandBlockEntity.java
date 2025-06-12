@@ -3,12 +3,28 @@ package com.example.blocks;
 import com.example.Main;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.LecternBlock;
 import net.minecraft.block.SignBlock;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.LecternBlockEntity;
 import net.minecraft.block.entity.SignBlockEntity;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.WritableBookContentComponent;
+import net.minecraft.component.type.WrittenBookContentComponent;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.RawFilteredPair;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
@@ -21,7 +37,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 public class ServerCommandBlockEntity extends BlockEntity {
@@ -46,15 +62,35 @@ public class ServerCommandBlockEntity extends BlockEntity {
     World world = null;
 
     private String ReadStack(int x, int y, int z) {
+        Stack<String> stack = new Stack<>();
+        return ReadStack(x, y, z, stack);
+    }
+
+    private String ReadStack(int x, int y, int z, Stack<String> tagStack) {
         BlockPos pos = new BlockPos(x, y, z);
         Block block = world.getBlockState(pos).getBlock();
-        if (pos.getY() >= world.getHeight() || CompareBlockID(block, "minecraft", "air"))
-            return "";
-
         String html = "";
+
+        if (pos.getY() >= world.getHeight() || CompareBlockID(block, "minecraft", "air")) {
+            while (!tagStack.isEmpty()) {
+                html += tagStack.pop();
+            }
+            return html;
+        }
+
         Identifier id = Registries.BLOCK.getId(block);
         System.out.println(id);
 
+        if (CompareBlockID(block, "server_outline")) {
+            if (tagStack.isEmpty())
+                return ReadStack(x, y + 1, z, tagStack);
+
+            html += tagStack.pop();
+            html += ReadStack(x, y + 1, z, tagStack);
+            return html;
+        }
+
+        //  Sign
         if (block instanceof SignBlock) {
             ServerWorld serverWorld = (ServerWorld) world; // cast only if you're sure it's server side
             final BlockPos finalPos = pos;
@@ -88,13 +124,75 @@ public class ServerCommandBlockEntity extends BlockEntity {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        // Lectern
+        } else if (block instanceof LecternBlock) {
+            ServerWorld serverWorld = (ServerWorld) world; // cast only if you're sure it's server side
+            final BlockPos finalPos = pos;
+            CompletableFuture<String> future = new CompletableFuture<>();
+            // Have the server deal with BlockEntities
+            serverWorld.getServer().execute(() -> {
+                BlockEntity be = world.getBlockEntity(finalPos);
+                System.out.println(be);
+                if (be instanceof LecternBlockEntity lecternEntity) {
+                    if (!lecternEntity.hasBook()) {
+                        future.complete("");
+                        return;
+                    }
+                    ItemStack book = lecternEntity.getBook();
+                    if (book.getItem() != Items.WRITABLE_BOOK && book.getItem() != Items.WRITTEN_BOOK) {
+                        future.complete("");
+                        return;
+                    }
 
+                    if (!book.contains(DataComponentTypes.WRITABLE_BOOK_CONTENT) && !book.contains(DataComponentTypes.WRITTEN_BOOK_CONTENT)) {
+                        future.complete("");
+                        return;
+                    }
+
+                    StringBuilder bookText = new StringBuilder();
+
+                    if (book.contains(DataComponentTypes.WRITTEN_BOOK_CONTENT)) {
+                        WrittenBookContentComponent content = book.get(DataComponentTypes.WRITTEN_BOOK_CONTENT);
+                        if (content != null) {
+                            for (int i = 0; i < content.pages().size(); i++) {
+                                RawFilteredPair<Text> page = content.pages().get(i);
+                                bookText.append(page.raw().getString());
+                                if (i < content.pages().size() - 1) {
+                                    bookText.append("\n");
+                                }
+                            }
+                        }
+                    }
+                    else if (book.contains(DataComponentTypes.WRITABLE_BOOK_CONTENT)) {
+                        WritableBookContentComponent content = book.get(DataComponentTypes.WRITABLE_BOOK_CONTENT);
+                        if (content != null) {
+                            for (int i = 0; i < content.pages().size(); i++) {
+                                RawFilteredPair<String> page = content.pages().get(i);
+                                bookText.append(page.raw());
+                                if (i < content.pages().size() - 1) {
+                                    bookText.append("\n");
+                                }
+                            }
+                        }
+                    }
+                    future.complete(bookText.toString());
+                }
+                future.complete("");
+            });
+            try {
+                String bookHtml = future.get();
+                bookHtml = bookHtml.replace("<", "&lt;");
+                bookHtml = bookHtml.replace(">", "&gt;");
+
+                html += bookHtml;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         } else {
             html += "\r\n<div>";
-            html += ReadStack(x, y + 1, z);
-            html += "\r\n</div>";
+            tagStack.push("\r\n</div>");
         }
-
+        html += ReadStack(x, y + 1, z, tagStack);
         return html;
     }
 
@@ -105,7 +203,6 @@ public class ServerCommandBlockEntity extends BlockEntity {
                 html += ReadStack(x, pos1.getY() + 1, z);
             }
         }
-
         return html;
     }
 
@@ -290,8 +387,8 @@ public class ServerCommandBlockEntity extends BlockEntity {
     }
 
     public int getPortForBlock(Block block) {
-        Identifier id = Registries.BLOCK.getId(block); // e.g., "yourmod:server_command_block"
-        int hash = id.toString().hashCode(); // turn into a consistent hash
+        Identifier id = Registries.BLOCK.getId(block);
+        int hash = id.toString().hashCode();
         int basePort = 3000;
 
         // Make sure the port is in a valid range (1024–65535)
