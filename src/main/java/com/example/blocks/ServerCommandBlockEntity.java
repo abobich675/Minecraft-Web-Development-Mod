@@ -45,51 +45,20 @@ public class ServerCommandBlockEntity extends BlockEntity {
         super(ModBlockEntities.SERVER_COMMAND_ENTITY, pos, state);
     }
 
-//    private int clicks = 0;
-//    public int getClicks() {
-//        return clicks;
-//    }
-//
-//    public void incrementClicks() {
-//        clicks++;
-//        markDirty();
-//    }
-
     final int MAX_SIZE = 32;
+    public String outline_block = Main.MOD_ID + ":server_outline";
+    public String style_block = Main.MOD_ID + ":style_outline";
+    private Dictionary<Block, String> styles = new Hashtable<>();
+
     public int port = 3000;
     public BlockPos pos1 = null;
     public BlockPos pos2 = null;
     World world = null;
 
-    private String ReadStack(int x, int y, int z) {
-        Stack<String> stack = new Stack<>();
-        return ReadStack(x, y, z, stack);
-    }
-
-    private String ReadStack(int x, int y, int z, Stack<String> tagStack) {
-        BlockPos pos = new BlockPos(x, y, z);
+    // Read text from a block at specified coordinates. Return "" if no text is found
+    private String ReadBlock(BlockPos pos) {
+        String text = "";
         Block block = world.getBlockState(pos).getBlock();
-        String html = "";
-
-        if (pos.getY() >= world.getHeight() || CompareBlockID(block, "minecraft", "air")) {
-            while (!tagStack.isEmpty()) {
-                html += tagStack.pop();
-            }
-            return html;
-        }
-
-        Identifier id = Registries.BLOCK.getId(block);
-        System.out.println(id);
-
-        if (CompareBlockID(block, "server_outline")) {
-            if (tagStack.isEmpty())
-                return ReadStack(x, y + 1, z, tagStack);
-
-            html += tagStack.pop();
-            html += ReadStack(x, y + 1, z, tagStack);
-            return html;
-        }
-
         //  Sign
         if (block instanceof SignBlock) {
             ServerWorld serverWorld = (ServerWorld) world; // cast only if you're sure it's server side
@@ -104,27 +73,24 @@ public class ServerCommandBlockEntity extends BlockEntity {
                     Text[] frontText = signEntity.getFrontText().getMessages(false);
                     Text[] backText = signEntity.getBackText().getMessages(false);
 
-                    for (Text text : frontText) {
-                        System.out.println(text.getString());
-                        signHtml += text.getString();
+                    for (Text currText : frontText) {
+                        System.out.println(currText.getString());
+                        signHtml += currText.getString();
                     }
-                    for (Text text : backText) {
-                        System.out.println(text.getString());
-                        signHtml += text.getString();
+                    for (Text currText : backText) {
+                        System.out.println(currText.getString());
+                        signHtml += currText.getString();
                     }
                 }
                 future.complete(signHtml);
             });
             try {
                 String signHtml = future.get();
-                signHtml = signHtml.replace("<", "&lt;");
-                signHtml = signHtml.replace(">", "&gt;");
-
-                html += signHtml;
+                text += signHtml;
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        // Lectern
+            // Lectern
         } else if (block instanceof LecternBlock) {
             ServerWorld serverWorld = (ServerWorld) world; // cast only if you're sure it's server side
             final BlockPos finalPos = pos;
@@ -181,16 +147,98 @@ public class ServerCommandBlockEntity extends BlockEntity {
             });
             try {
                 String bookHtml = future.get();
-                bookHtml = bookHtml.replace("<", "&lt;");
-                bookHtml = bookHtml.replace(">", "&gt;");
 
-                html += bookHtml;
+                text += bookHtml;
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        } else {
-            html += "\r\n<div>";
+        }
+        return text;
+    }
+
+
+    private String ReadStack(int x, int y, int z) {
+        Stack<String> stack = new Stack<>();
+        return ReadStack(x, y, z, stack);
+    }
+
+    private String ReadStack(int x, int y, int z, Stack<String> tagStack) {
+        return ReadStack(x, y, z, tagStack, null);
+    }
+
+    private String ReadStack(int x, int y, int z, Stack<String> tagStack, Block currStyle) {
+        BlockPos pos = new BlockPos(x, y, z);
+        Block block = world.getBlockState(pos).getBlock();
+        String html = "";
+
+        if (pos.getY() >= world.getHeight() || CompareBlockID(block, "minecraft:air")) {
+            while (!tagStack.isEmpty()) {
+                html += tagStack.pop();
+            }
+            return html;
+        }
+
+        Identifier id = Registries.BLOCK.getId(block);
+        System.out.println(id);
+
+        if (CompareBlockID(block, style_block)) {
+            // Define which style to edit
+            if (currStyle == null) {
+                currStyle = world.getBlockState(pos.up()).getBlock();
+                styles.remove(currStyle);
+                return ReadStack(x, y + 2, z, tagStack, currStyle);
+            }
+
+            return ReadStack(x, y + 1, z, tagStack, null);
+        }
+
+        if (currStyle != null) {
+
+            // Update style
+            String text = ReadBlock(pos);
+            System.out.println("text: " + text);
+            if (text.isEmpty()) {
+                text = styles.get(block);
+            }
+            System.out.println("text after checking block: " + text);
+
+            if (text == null) {
+                text = "";
+            }
+
+            String curr = styles.get(currStyle);
+            if (curr == null) {
+                curr = "";
+            }
+            styles.put(currStyle, curr + text);
+
+            // Move on
+            return ReadStack(x, y + 1, z, tagStack, currStyle);
+        }
+
+        if (CompareBlockID(block, outline_block)) {
+            if (tagStack.isEmpty())
+                return ReadStack(x, y + 1, z, tagStack);
+
+            html += tagStack.pop();
+            html += ReadStack(x, y + 1, z, tagStack);
+            return html;
+        }
+
+        String blockText = ReadBlock(pos);
+        blockText = blockText.replace("<", "&lt;");
+        blockText = blockText.replace(">", "&gt;");
+
+        if (blockText.isEmpty()) {
+            String blockStyle =  styles.get(block);
+            if (blockStyle == null) {
+                html += "\r\n<div>";
+            } else {
+                html += "\r\n<div style='" + blockStyle + "'>";
+            }
             tagStack.push("\r\n</div>");
+        } else {
+            html += blockText;
         }
         html += ReadStack(x, y + 1, z, tagStack);
         return html;
@@ -272,14 +320,9 @@ public class ServerCommandBlockEntity extends BlockEntity {
         }).start();
     }
 
-    private boolean CompareBlockID(Block block, String name) {
+    private boolean CompareBlockID(Block block, String modAndName) {
         Identifier id = Registries.BLOCK.getId(block);
-        return id.toString().equals(Main.MOD_ID + ":" + name);
-    }
-
-    private boolean CompareBlockID(Block block, String modId, String name) {
-        Identifier id = Registries.BLOCK.getId(block);
-        return id.toString().equals(modId + ":" + name);
+        return id.toString().equals(modAndName);
     }
 
     private boolean IsValidServer(BlockPos pos) {
@@ -292,14 +335,15 @@ public class ServerCommandBlockEntity extends BlockEntity {
         // Check blocks around Command Block
         pos1 = pos.down();
         Block pos1Block = world.getBlockState(pos1).getBlock();
-        if (!CompareBlockID(pos1Block, "server_outline")) {
+        if (!CompareBlockID(pos1Block, outline_block)) {
+            System.out.println("Block below was invalid: " + pos1Block);
             return false;
         }
 
-        boolean n = CompareBlockID(world.getBlockState(pos1.north()).getBlock(), "server_outline");
-        boolean s = CompareBlockID(world.getBlockState(pos1.south()).getBlock(), "server_outline");
-        boolean e = CompareBlockID(world.getBlockState(pos1.east()).getBlock(), "server_outline");
-        boolean w = CompareBlockID(world.getBlockState(pos1.west()).getBlock(), "server_outline");
+        boolean n = CompareBlockID(world.getBlockState(pos1.north()).getBlock(), outline_block);
+        boolean s = CompareBlockID(world.getBlockState(pos1.south()).getBlock(), outline_block);
+        boolean e = CompareBlockID(world.getBlockState(pos1.east()).getBlock(), outline_block);
+        boolean w = CompareBlockID(world.getBlockState(pos1.west()).getBlock(), outline_block);
 
         if (!(n || s || e || w)) {
             System.out.println("No structure found");
@@ -314,7 +358,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
         // Find edges of structure
         // East
         BlockPos curr = pos1;
-        while(CompareBlockID(world.getBlockState(curr.east()).getBlock(), "server_outline")) {
+        while(CompareBlockID(world.getBlockState(curr.east()).getBlock(), outline_block)) {
             curr = curr.east();
             upperX = curr.getX();
 
@@ -324,7 +368,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
 
         // West
         curr = pos1;
-        while(CompareBlockID(world.getBlockState(curr.west()).getBlock(), "server_outline")) {
+        while(CompareBlockID(world.getBlockState(curr.west()).getBlock(), outline_block)) {
             curr = curr.west();
             lowerX = curr.getX();
 
@@ -334,7 +378,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
 
         // South
         curr = pos1;
-        while(CompareBlockID(world.getBlockState(curr.south()).getBlock(), "server_outline")) {
+        while(CompareBlockID(world.getBlockState(curr.south()).getBlock(), outline_block)) {
             curr = curr.south();
             upperZ = curr.getZ();
 
@@ -344,7 +388,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
 
         // North
         curr = pos1;
-        while(CompareBlockID(world.getBlockState(curr.north()).getBlock(), "server_outline")) {
+        while(CompareBlockID(world.getBlockState(curr.north()).getBlock(), outline_block)) {
             curr = curr.north();
             lowerZ = curr.getZ();
 
@@ -361,7 +405,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
         for (int x = lowerX; x <= upperX; x++) {
             for (int z = lowerZ; z <= upperZ; z++) {
                 Block block = world.getBlockState(new BlockPos(x, lowerY, z)).getBlock();
-                if (!CompareBlockID(block, "server_outline")) {
+                if (!CompareBlockID(block, outline_block)) {
                     System.out.println("Bad block at: (" + x + ", " + lowerY + ", " + z + ")" );
                     return false;
                 }
