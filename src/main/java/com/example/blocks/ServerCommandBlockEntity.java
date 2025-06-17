@@ -231,12 +231,20 @@ public class ServerCommandBlockEntity extends BlockEntity {
 
         if (blockText.isEmpty()) {
             String blockStyle =  styles.get(block);
-            if (blockStyle == null) {
-                html += "\r\n<div>";
+            boolean isTransparent = !block.getDefaultState().isOpaque();
+            if (isTransparent) {
+                if (blockStyle == null)
+                    html += "\r\n<span>";
+                else
+                    html += "\r\n<span style='" + blockStyle + "'>";
+                tagStack.push("\r\n</span>");
             } else {
-                html += "\r\n<div style='" + blockStyle + "'>";
+                if (blockStyle == null)
+                    html += "\r\n<div>";
+                else
+                    html += "\r\n<div style='" + blockStyle + "'>";
+                tagStack.push("\r\n</div>");
             }
-            tagStack.push("\r\n</div>");
         } else {
             html += blockText;
         }
