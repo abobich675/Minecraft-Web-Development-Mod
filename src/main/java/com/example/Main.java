@@ -5,9 +5,13 @@ import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.block.Block;
+import net.minecraft.command.CommandSource;
 import net.minecraft.command.argument.BlockPosArgumentType;
+import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.world.ServerWorld;
@@ -39,9 +43,24 @@ public class Main implements ModInitializer {
 		// Proceed with mild caution.
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-			dispatcher.register(CommandManager.literal("host")
+			dispatcher.register(CommandManager.literal("webhost")
 				.then (CommandManager.argument("pos", BlockPosArgumentType.blockPos())
 					.executes(Main::hostCommand)));
+		});
+
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+			dispatcher.register(CommandManager.literal("weblist")
+							.executes(Main::listCommand));
+		});
+
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+			dispatcher.register(CommandManager.literal("webstop")
+				.then (CommandManager.argument("id", IdentifierArgumentType.identifier())
+					.suggests((commandContext, suggestionsBuilder) -> {
+						Registry<Block> blockRegistries = Registries.BLOCK;
+						return CommandSource.suggestIdentifiers(blockRegistries.getIds(), suggestionsBuilder);
+					})
+						.executes(Main::stopCommand)));
 		});
 
 		LOGGER.info("Hello from WebDevMod!");
@@ -88,7 +107,40 @@ public class Main implements ModInitializer {
 		}
 
 		sites.put(block, newSite);
-		context.getSource().sendFeedback(() -> Text.literal("Hosting " + id), false);
+		context.getSource().sendFeedback(() -> Text.literal("Hosting: " + id), false);
 		return 1;
+	}
+
+	private static int listCommand(CommandContext<ServerCommandSource> context) {
+		Enumeration<Block> keys = sites.keys();
+		if (!keys.hasMoreElements()) {
+			context.getSource().sendFeedback(() -> Text.literal("Nothing is currently hosted."), false);
+			return 0;
+		}
+
+		context.getSource().sendFeedback(() -> Text.literal("Hosting: "), false);
+		while (keys.hasMoreElements()) {
+			Block key = keys.nextElement();
+			context.getSource().sendFeedback(() -> Text.literal(Registries.BLOCK.getId(key).toString()), false);
+		}
+		return 1;
+	}
+
+	private static int stopCommand(CommandContext<ServerCommandSource> context) {
+		Identifier id = IdentifierArgumentType.getIdentifier(context, "id");
+		Enumeration<Block> keys = sites.keys();
+		while (keys.hasMoreElements()) {
+			Block key = keys.nextElement();
+			if (Registries.BLOCK.getId(key).equals(id)) {
+				Site site = sites.get(key);
+				site.stop();
+				sites.remove(key);
+				context.getSource().sendFeedback(() -> Text.literal("Successfully shut down: " + id), false);
+				return 1;
+			}
+		}
+		context.getSource().sendFeedback(() -> Text.literal(id + " not found"), false);
+
+		return 0;
 	}
 }

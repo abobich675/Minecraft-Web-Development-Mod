@@ -54,6 +54,8 @@ public class Site {
     Identifier style_block = null;
     Dictionary<Block, String> styles = new Hashtable<>();
 
+    ServerSocket server = null;
+    Thread serverThread = null;
     int port = 3000;
     BlockPos pos1 = null;
     BlockPos pos2 = null;
@@ -314,27 +316,45 @@ public class Site {
     }
 
     private void StartServer(PlayerEntity player) {
-        new Thread(() -> {
-            try (ServerSocket server = new ServerSocket(port)){
+        serverThread = new Thread(() -> {
+            try (ServerSocket s = new ServerSocket(port)){
+                server = s;
                 System.out.println("Server listening on port " + port + "...");
-                while (true) {
-                    try (Socket client = server.accept()) {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try (Socket client = s.accept()) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            System.out.println("Is Interrupted!");
+                            break;
+                        }
+
                         BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                         PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                         String message = in.readLine();
                         System.out.println("Received: " + message);
 
-                        String getRequest = "GET / HTTP/1.1";
-                        if (message.startsWith(getRequest)) {
+                        if (message.startsWith("GET / HTTP/1.1")) {
                             SendHTTPResponse(out);
                         }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        break;
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
                 player.sendMessage(net.minecraft.text.Text.literal("Server Error!"), true);
+            } finally {
+                try {
+                    if (server != null && !server.isClosed()) {
+                        player.sendMessage(net.minecraft.text.Text.literal("Server Closing."), true);
+                        server.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        }).start();
+        });
+        serverThread.start();
     }
 
     //  TODO: REMOVE. THIS IS A TEMP
@@ -354,6 +374,12 @@ public class Site {
         int lowerY = pos.getY() - 1;
         int upperZ = pos.getZ();
         int lowerZ = upperZ;
+
+        // Check that style block and outline block are different
+        if (outline_block == style_block) {
+            System.out.println("Outline and Style cannot be the same: " + outline_block);
+            return false;
+        }
 
         // Check blocks around Command Block
         pos1 = pos.down();
@@ -463,4 +489,17 @@ public class Site {
             return 0;
     }
 
+    public void stop() {
+        if (serverThread != null) {
+            serverThread.interrupt();
+        }
+
+        try {
+            if (server != null && !server.isClosed()) {
+                server.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
