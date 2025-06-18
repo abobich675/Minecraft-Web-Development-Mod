@@ -35,6 +35,9 @@
 		"java": ">=21",
 		"fabric-api": "*"
 	},
+	"custom": {
+		"fabric-networking-v1:optional": true
+	},
 	"suggests": {
 		"another-mod": "*"
 	}

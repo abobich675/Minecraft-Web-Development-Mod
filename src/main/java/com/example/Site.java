@@ -60,7 +60,6 @@ public class Site {
 
     private boolean CompareBlockID(Block block, Identifier id) {
         Identifier blockId = Registries.BLOCK.getId(block);
-        System.out.println("Comparing " + blockId + " to " + id);
         return blockId.equals(id);
     }
 
