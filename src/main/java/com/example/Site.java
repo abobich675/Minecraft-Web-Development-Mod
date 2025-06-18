@@ -56,7 +56,7 @@ public class Site {
 
     ServerSocket server = null;
     Thread serverThread = null;
-    int port = 3000;
+    public int port = 0;
     BlockPos pos1 = null;
     BlockPos pos2 = null;
 
@@ -357,7 +357,6 @@ public class Site {
         serverThread.start();
     }
 
-    //  TODO: REMOVE. THIS IS A TEMP
     public int getPortForBlock(Block block) {
         Identifier id = Registries.BLOCK.getId(block);
         int hash = id.toString().hashCode();

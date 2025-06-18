@@ -21,6 +21,12 @@ import net.minecraft.util.math.BlockPos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
@@ -30,6 +36,7 @@ public class Main implements ModInitializer {
 
 	public static final String MOD_ID = "webdevmod";
 	public static final int MAX_SIZE = 32;
+	public static final int PORT = 3000;
 
 	// This logger is used to write text to the console and the log file.
 	// It is considered best practice to use your mod id as the logger's name.
@@ -62,6 +69,8 @@ public class Main implements ModInitializer {
 					})
 						.executes(Main::stopCommand)));
 		});
+
+		hostIndex();
 
 		LOGGER.info("Hello from WebDevMod!");
 	}
@@ -140,7 +149,66 @@ public class Main implements ModInitializer {
 			}
 		}
 		context.getSource().sendFeedback(() -> Text.literal(id + " not found"), false);
-
 		return 0;
+	}
+
+	private static String GetHTML() {
+
+		String html = "";
+
+		Enumeration <Block> keys = sites.keys();
+		while (keys.hasMoreElements()) {
+			Block currBlock = keys.nextElement();
+			Site currSite = sites.get(currBlock);
+			html += "<div><a href=\"#\" target=\"_blank\" onclick=\"this.href = window.location.protocol + '//' + window.location.hostname + ':" + currSite.port + "';\">" + currBlock.toString() + "</a></div>";
+		}
+
+		return "<html>" + html + "</html>";
+	}
+
+	private static void SendHTTPResponse(PrintWriter out) {
+		String html = GetHTML();
+		final String http =
+				"HTTP/1.1 200 OK\r\n" +
+						"Content-Length: " + html.length() + "\r\n" +
+						"Content-Type: text/html\r\n" +
+						"\r\n" +
+						html;
+		out.println(http);
+	}
+
+	private static void hostIndex() {
+		new Thread(() -> {
+			ServerSocket server = null;
+			try (ServerSocket s = new ServerSocket(PORT)){
+				server = s;
+				System.out.println("Index server listening on port " + PORT + "...");
+				while (true) {
+					try (Socket client = server.accept()) {
+						BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+						PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+						String message = in.readLine();
+						System.out.println("Received: " + message);
+
+						if (message.startsWith("GET / HTTP/1.1")) {
+							SendHTTPResponse(out);
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+						break;
+					}
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			} finally {
+				try {
+					if (server != null && !server.isClosed()) {
+						server.close();
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}).start();
 	}
 }
