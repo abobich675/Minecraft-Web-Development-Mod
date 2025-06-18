@@ -1,4 +1,4 @@
-package com.example.blocks;
+package com.example;
 
 import com.example.Main;
 import net.minecraft.block.Block;
@@ -30,20 +30,39 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class ServerCommandBlockEntity extends BlockEntity {
-    public ServerCommandBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlockEntities.SERVER_COMMAND_ENTITY, pos, state);
+public class Site {
+
+    public Site(PlayerEntity player, World world, BlockPos pos) {
+        this.player = player;
+        this.world = world;
+        this.pos = pos;
+
+        // Get style block
+        Block block = world.getBlockState(pos).getBlock();
+        this.style_block = Registries.BLOCK.getId(block);
+
+        // Get outline block
+        block = world.getBlockState(pos.down()).getBlock();
+        this.outline_block = Registries.BLOCK.getId(block);
     }
 
-    final int MAX_SIZE = 32;
-    public String outline_block = Main.MOD_ID + ":server_outline";
-    public String style_block = Main.MOD_ID + ":style_outline";
-    private Dictionary<Block, String> styles = new Hashtable<>();
+    PlayerEntity player;
+    World world;
+    BlockPos pos;
 
-    public int port = 3000;
-    public BlockPos pos1 = null;
-    public BlockPos pos2 = null;
-    World world = null;
+    Identifier outline_block = null;
+    Identifier style_block = null;
+    Dictionary<Block, String> styles = new Hashtable<>();
+
+    int port = 3000;
+    BlockPos pos1 = null;
+    BlockPos pos2 = null;
+
+    private boolean CompareBlockID(Block block, Identifier id) {
+        Identifier blockId = Registries.BLOCK.getId(block);
+        System.out.println("Comparing " + blockId + " to " + id);
+        return blockId.equals(id);
+    }
 
     // Read text from a block at specified coordinates. Return "" if no text is found
     private String ReadBlock(BlockPos pos) {
@@ -146,7 +165,6 @@ public class ServerCommandBlockEntity extends BlockEntity {
         return text;
     }
 
-
     private String ReadStack(int x, int y, int z) {
         Stack<String> stack = new Stack<>();
         return ReadStack(x, y, z, stack);
@@ -161,7 +179,9 @@ public class ServerCommandBlockEntity extends BlockEntity {
         Block block = world.getBlockState(pos).getBlock();
         String html = "";
 
-        if (pos.getY() >= world.getHeight() || CompareBlockID(block, "minecraft:air")) {
+        Identifier blockId = Registries.BLOCK.getId(block);
+        boolean isAir = blockId.toString().equals("minecraft:air");
+        if (pos.getY() >= world.getHeight() || isAir) {
             while (!tagStack.isEmpty()) {
                 html += tagStack.pop();
             }
@@ -318,9 +338,15 @@ public class ServerCommandBlockEntity extends BlockEntity {
         }).start();
     }
 
-    private boolean CompareBlockID(Block block, String modAndName) {
+    //  TODO: REMOVE. THIS IS A TEMP
+    public int getPortForBlock(Block block) {
         Identifier id = Registries.BLOCK.getId(block);
-        return id.toString().equals(modAndName);
+        int hash = id.toString().hashCode();
+        int basePort = 3000;
+
+        // Make sure the port is in a valid range (1024–65535)
+        int port = basePort + (Math.abs(hash) % (65535 - basePort));
+        return port;
     }
 
     private boolean IsValidServer(BlockPos pos) {
@@ -360,7 +386,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
             curr = curr.east();
             upperX = curr.getX();
 
-            if (upperX - lowerX > MAX_SIZE)
+            if (upperX - lowerX > Main.MAX_SIZE)
                 return false;
         }
 
@@ -370,7 +396,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
             curr = curr.west();
             lowerX = curr.getX();
 
-            if (upperX - lowerX > MAX_SIZE)
+            if (upperX - lowerX > Main.MAX_SIZE)
                 return false;
         }
 
@@ -380,7 +406,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
             curr = curr.south();
             upperZ = curr.getZ();
 
-            if (upperZ - lowerZ > MAX_SIZE)
+            if (upperZ - lowerZ > Main.MAX_SIZE)
                 return false;
         }
 
@@ -390,7 +416,7 @@ public class ServerCommandBlockEntity extends BlockEntity {
             curr = curr.north();
             lowerZ = curr.getZ();
 
-            if (upperZ - lowerZ > MAX_SIZE)
+            if (upperZ - lowerZ > Main.MAX_SIZE)
                 return false;
         }
 
@@ -428,20 +454,9 @@ public class ServerCommandBlockEntity extends BlockEntity {
         return true;
     }
 
-    public int getPortForBlock(Block block) {
-        Identifier id = Registries.BLOCK.getId(block);
-        int hash = id.toString().hashCode();
-        int basePort = 3000;
-
-        // Make sure the port is in a valid range (1024–65535)
-        int port = basePort + (Math.abs(hash) % (65535 - basePort));
-        return port;
-    }
-
-    public int tryStartServer(PlayerEntity player, World world, BlockPos pos, int port) {
-        this.world = world;
+    public int tryStartServer() {
         if (IsValidServer(pos)) {
-            this.port = getPortForBlock(world.getBlockState(pos.up()).getBlock());
+            this.port = getPortForBlock(world.getBlockState(pos).getBlock());
             StartServer(player);
             return 1;
         }
