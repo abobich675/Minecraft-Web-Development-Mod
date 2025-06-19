@@ -107,10 +107,10 @@ public class Main implements ModInitializer {
 
 		Site newSite = new Site(player, world, pos);
 
-		int result = newSite.tryStartServer();
+		boolean valid = newSite.IsValidServer(pos);
 
 		Identifier id = Registries.BLOCK.getId(block);
-		if (result == 0) {
+		if (!valid) {
 			context.getSource().sendFeedback(() -> Text.literal("Failed to host " + id + ". Invalid Setup."), false);
 			return 0;
 		}
@@ -142,7 +142,6 @@ public class Main implements ModInitializer {
 			Block key = keys.nextElement();
 			if (Registries.BLOCK.getId(key).equals(id)) {
 				Site site = sites.get(key);
-				site.stop();
 				sites.remove(key);
 				context.getSource().sendFeedback(() -> Text.literal("Successfully shut down: " + id), false);
 				return 1;
@@ -154,20 +153,51 @@ public class Main implements ModInitializer {
 
 	private static String GetHTML() {
 
-		String html = "";
+		String html = "<head>\n" +
+				"        <title>Index - Minecraft Web Dev Mod</title>\n" +
+				"    </head>\n" +
+				"    <body>\n" +
+				"        <h1 style=\"display: flex; justify-content: center; padding: 20px;\">Minecraft Web Dev</h1>\n" +
+				"        <h3>Welcome! Below is a list of all hosted blocks.</h3>\n";
 
 		Enumeration <Block> keys = sites.keys();
 		while (keys.hasMoreElements()) {
-			Block currBlock = keys.nextElement();
-			Site currSite = sites.get(currBlock);
-			html += "<div><a href=\"#\" target=\"_blank\" onclick=\"this.href = window.location.protocol + '//' + window.location.hostname + ':" + currSite.port + "';\">" + currBlock.toString() + "</a></div>";
+			Identifier id = Registries.BLOCK.getId(keys.nextElement());
+			html += "<div><a href=\"/" + id + "\" target=\"_blank\";\">" + id + "</a></div>";
 		}
-
+		html += "</body>";
 		return "<html>" + html + "</html>";
 	}
 
-	private static void SendHTTPResponse(PrintWriter out) {
+	private static void SendIndexResponse(PrintWriter out) {
 		String html = GetHTML();
+		final String http =
+				"HTTP/1.1 200 OK\r\n" +
+						"Content-Length: " + html.length() + "\r\n" +
+						"Content-Type: text/html\r\n" +
+						"\r\n" +
+						html;
+		out.println(http);
+	}
+
+	private static void Send404Response(PrintWriter out) {
+		String html = "<html><head>\n" +
+				"        <title>404 - Minecraft Web Dev Mod</title>\n" +
+				"    </head><body>\n" +
+				"        <h1 style=\"display: flex; justify-content: center; padding: 20px;\">Error 404</h1>\n" +
+				"        <p style=\"display: flex; justify-content: center;\">Page not found. This block is not currently being hosted.</p>\n" +
+				"    </body></html>";
+		final String http =
+				"HTTP/1.1 200 OK\r\n" +
+						"Content-Length: " + html.length() + "\r\n" +
+						"Content-Type: text/html\r\n" +
+						"\r\n" +
+						html;
+		out.println(http);
+	}
+
+	private static void SendSiteResponse(PrintWriter out, Site site) {
+		String html = site.GetHTML();
 		final String http =
 				"HTTP/1.1 200 OK\r\n" +
 						"Content-Length: " + html.length() + "\r\n" +
@@ -191,7 +221,27 @@ public class Main implements ModInitializer {
 						System.out.println("Received: " + message);
 
 						if (message.startsWith("GET / HTTP/1.1")) {
-							SendHTTPResponse(out);
+							SendIndexResponse(out);
+						} else if (message.startsWith("GET /")) {
+							int start = message.indexOf('/') + 1;
+							int stop = message.indexOf("HTTP/1.1") - 1;
+							String path = message.substring(start, stop);
+
+							Enumeration<Block> keys = sites.keys();
+							Block found = null;
+							while (keys.hasMoreElements()) {
+								Block key = keys.nextElement();
+								if (Registries.BLOCK.getId(key).toString().equals(path)) {
+									found = key;
+									break;
+								}
+							}
+
+							if (found == null) {
+								Send404Response(out);
+							} else {
+								SendSiteResponse(out, sites.get(found));
+							}
 						}
 					} catch (IOException e) {
 						e.printStackTrace();

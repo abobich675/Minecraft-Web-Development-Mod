@@ -283,7 +283,7 @@ public class Site {
         return html;
     }
 
-    private String GetHTML() {
+    public String GetHTML() {
 
         int xDir = (pos1.getX() > pos2.getX()) ? -1 : 1;
         int zDir = (pos1.getZ() > pos2.getZ()) ? -1 : 1;
@@ -301,73 +301,53 @@ public class Site {
         else
             html = ParseXZ(xDir, zDir);
 
-        return "<html>" + html + "</html>";
+        return "<html>" + html + "<title>" + this.style_block + " - Minecraft Web Dev Mod</title></html>";
     }
 
-    private void SendHTTPResponse(PrintWriter out) {
-        String html = GetHTML();
-        final String http =
-                "HTTP/1.1 200 OK\r\n" +
-                        "Content-Length: " + html.length() + "\r\n" +
-                        "Content-Type: text/html\r\n" +
-                        "\r\n" +
-                        html;
-        out.println(http);
-    }
+    // TODO: REMOVE
+//    private void StartServer(PlayerEntity player) {
+//        serverThread = new Thread(() -> {
+//            try (ServerSocket s = new ServerSocket(port)){
+//                server = s;
+//                System.out.println("Server listening on port " + port + "...");
+//                while (!Thread.currentThread().isInterrupted()) {
+//                    try (Socket client = s.accept()) {
+//                        if (Thread.currentThread().isInterrupted()) {
+//                            System.out.println("Is Interrupted!");
+//                            break;
+//                        }
+//
+//                        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+//                        PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+//                        String message = in.readLine();
+//                        System.out.println("Received: " + message);
+//
+//                        if (message.startsWith("GET / HTTP/1.1")) {
+//                            SendHTTPResponse(out);
+//                        }
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                        break;
+//                    }
+//                }
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//                player.sendMessage(net.minecraft.text.Text.literal("Server Error!"), true);
+//            } finally {
+//                try {
+//                    if (server != null && !server.isClosed()) {
+//                        player.sendMessage(net.minecraft.text.Text.literal("Server Closing."), true);
+//                        server.close();
+//                    }
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        });
+//        serverThread.start();
+//    }
 
-    private void StartServer(PlayerEntity player) {
-        serverThread = new Thread(() -> {
-            try (ServerSocket s = new ServerSocket(port)){
-                server = s;
-                System.out.println("Server listening on port " + port + "...");
-                while (!Thread.currentThread().isInterrupted()) {
-                    try (Socket client = s.accept()) {
-                        if (Thread.currentThread().isInterrupted()) {
-                            System.out.println("Is Interrupted!");
-                            break;
-                        }
-
-                        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-                        PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-                        String message = in.readLine();
-                        System.out.println("Received: " + message);
-
-                        if (message.startsWith("GET / HTTP/1.1")) {
-                            SendHTTPResponse(out);
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        break;
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                player.sendMessage(net.minecraft.text.Text.literal("Server Error!"), true);
-            } finally {
-                try {
-                    if (server != null && !server.isClosed()) {
-                        player.sendMessage(net.minecraft.text.Text.literal("Server Closing."), true);
-                        server.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        serverThread.start();
-    }
-
-    public int getPortForBlock(Block block) {
-        Identifier id = Registries.BLOCK.getId(block);
-        int hash = id.toString().hashCode();
-        int basePort = 3000;
-
-        // Make sure the port is in a valid range (1024–65535)
-        int port = basePort + (Math.abs(hash) % (65535 - basePort));
-        return port;
-    }
-
-    private boolean IsValidServer(BlockPos pos) {
+    public boolean IsValidServer(BlockPos pos) {
         int upperX = pos.getX();
         int lowerX = upperX;
         int lowerY = pos.getY() - 1;
@@ -476,29 +456,5 @@ public class Site {
         pos2 = new BlockPos(x, lowerY, z);
 
         return true;
-    }
-
-    public int tryStartServer() {
-        if (IsValidServer(pos)) {
-            this.port = getPortForBlock(world.getBlockState(pos).getBlock());
-            StartServer(player);
-            return 1;
-        }
-        else
-            return 0;
-    }
-
-    public void stop() {
-        if (serverThread != null) {
-            serverThread.interrupt();
-        }
-
-        try {
-            if (server != null && !server.isClosed()) {
-                server.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 }
