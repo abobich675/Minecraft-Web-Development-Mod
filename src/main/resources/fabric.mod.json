@@ -3,7 +3,7 @@
 	"id": "webdevmod",
 	"version": "${version}",
 	"name": "Web Development Mod",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "Utilizes sockets to make direct TCP connections and serve HTML websites straight from inside Minecraft.",
 	"authors": [
 		"Adam Bobich"
 	],
