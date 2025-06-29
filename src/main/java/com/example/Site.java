@@ -1,8 +1,6 @@
 package com.example;
 
-import com.example.Main;
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
 import net.minecraft.block.LecternBlock;
 import net.minecraft.block.SignBlock;
 import net.minecraft.block.entity.BlockEntity;
@@ -21,12 +19,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -50,13 +43,9 @@ public class Site {
     World world;
     BlockPos pos;
 
-    Identifier outline_block = null;
-    Identifier style_block = null;
+    Identifier outline_block;
+    Identifier style_block;
     Dictionary<Block, String> styles = new Hashtable<>();
-
-    ServerSocket server = null;
-    Thread serverThread = null;
-    public int port = 0;
     BlockPos pos1 = null;
     BlockPos pos2 = null;
 
@@ -303,49 +292,6 @@ public class Site {
 
         return "<html>" + html + "<title>" + this.style_block + " - Minecraft Web Dev Mod</title></html>";
     }
-
-    // TODO: REMOVE
-//    private void StartServer(PlayerEntity player) {
-//        serverThread = new Thread(() -> {
-//            try (ServerSocket s = new ServerSocket(port)){
-//                server = s;
-//                System.out.println("Server listening on port " + port + "...");
-//                while (!Thread.currentThread().isInterrupted()) {
-//                    try (Socket client = s.accept()) {
-//                        if (Thread.currentThread().isInterrupted()) {
-//                            System.out.println("Is Interrupted!");
-//                            break;
-//                        }
-//
-//                        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-//                        PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-//                        String message = in.readLine();
-//                        System.out.println("Received: " + message);
-//
-//                        if (message.startsWith("GET / HTTP/1.1")) {
-//                            SendHTTPResponse(out);
-//                        }
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                        break;
-//                    }
-//                }
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//                player.sendMessage(net.minecraft.text.Text.literal("Server Error!"), true);
-//            } finally {
-//                try {
-//                    if (server != null && !server.isClosed()) {
-//                        player.sendMessage(net.minecraft.text.Text.literal("Server Closing."), true);
-//                        server.close();
-//                    }
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        });
-//        serverThread.start();
-//    }
 
     public boolean IsValidServer(BlockPos pos) {
         int upperX = pos.getX();

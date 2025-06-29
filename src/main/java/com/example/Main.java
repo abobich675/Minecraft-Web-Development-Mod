@@ -9,7 +9,6 @@ import net.minecraft.command.CommandSource;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.server.command.CommandManager;
@@ -36,7 +35,7 @@ public class Main implements ModInitializer {
 
 	public static final String MOD_ID = "webdevmod";
 	public static final int MAX_SIZE = 32;
-	public static final int PORT = 3000;
+	public static final int PORT = 80;
 
 	// This logger is used to write text to the console and the log file.
 	// It is considered best practice to use your mod id as the logger's name.
@@ -141,7 +140,6 @@ public class Main implements ModInitializer {
 		while (keys.hasMoreElements()) {
 			Block key = keys.nextElement();
 			if (Registries.BLOCK.getId(key).equals(id)) {
-				Site site = sites.get(key);
 				sites.remove(key);
 				context.getSource().sendFeedback(() -> Text.literal("Successfully shut down: " + id), false);
 				return 1;
@@ -153,12 +151,15 @@ public class Main implements ModInitializer {
 
 	private static String GetHTML() {
 
-		String html = "<head>\n" +
-				"        <title>Index - Minecraft Web Dev Mod</title>\n" +
-				"    </head>\n" +
-				"    <body>\n" +
-				"        <h1 style=\"display: flex; justify-content: center; padding: 20px;\">Minecraft Web Dev</h1>\n" +
-				"        <h3>Welcome! Below is a list of all hosted blocks.</h3>\n";
+		String html = """
+				<head>
+					<title>Index - Minecraft Web Dev Mod</title>
+					</head>
+				<body>
+					<h1 style="display: flex; justify-content: center; padding: 20px;">Minecraft Web Dev</h1>
+					<h3>Welcome! Below is a list of all hosted blocks.</h3>
+				""";
+
 
 		Enumeration <Block> keys = sites.keys();
 		while (keys.hasMoreElements()) {
@@ -181,12 +182,18 @@ public class Main implements ModInitializer {
 	}
 
 	private static void Send404Response(PrintWriter out) {
-		String html = "<html><head>\n" +
-				"        <title>404 - Minecraft Web Dev Mod</title>\n" +
-				"    </head><body>\n" +
-				"        <h1 style=\"display: flex; justify-content: center; padding: 20px;\">Error 404</h1>\n" +
-				"        <p style=\"display: flex; justify-content: center;\">Page not found. This block is not currently being hosted.</p>\n" +
-				"    </body></html>";
+		String html = """
+				<html>
+					<head>
+						<title>404 - Minecraft Web Dev Mod</title>
+					</head>
+					<body>
+						<h1 style="display: flex; justify-content: center; padding: 20px;">Error 404</h1>
+						<p style="display: flex; justify-content: center;">Page not found. This block is not currently being hosted.</p>
+					</body>
+				</html>
+				""";
+
 		final String http =
 				"HTTP/1.1 200 OK\r\n" +
 						"Content-Length: " + html.length() + "\r\n" +
@@ -208,7 +215,7 @@ public class Main implements ModInitializer {
 	}
 
 	private static void hostIndex() {
-		new Thread(() -> {
+		Thread t = new Thread(() -> {
 			ServerSocket server = null;
 			try (ServerSocket s = new ServerSocket(PORT)){
 				server = s;
@@ -259,6 +266,8 @@ public class Main implements ModInitializer {
 					e.printStackTrace();
 				}
 			}
-		}).start();
+		});
+		t.setDaemon(true);
+		t.start();
 	}
 }
